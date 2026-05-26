@@ -61,7 +61,7 @@ A modern, privacy-focused single-page budgeting web application built with vanil
 3. That's it! No installation, no npm, no build step.
 
 ### Option 2: Try the Demo
-Visit the [live demo]([https://your-domain.com/budgetingready](https://shakil95ahmed.github.io/br-online/)) (if hosted)
+Visit the [live demo]([https://ztostart.com/budgetingready](https://shakil95ahmed.github.io/br-online/)) (if hosted)
 
 ---
 
@@ -262,7 +262,7 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 - **Issues:** [GitHub Issues](../../issues)
 - **Discussions:** [GitHub Discussions](../../discussions)
-- **Website:** [budgetingready.com](https://ztostart.com)
+- **Website:** [ztostart.com](https://ztostart.com)
 - **Email:** contact@ztostart.com
 
 ---
