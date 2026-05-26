@@ -39,11 +39,13 @@
     <span class="brand-name">BudgetingReady</span>
     <span class="brand-sub">Monthly Planner</span>
   </div>
-  <div class="header-actions">
-    <span class="brand-sub">Utilize Import/Export to preserve data</span>
-    <button id="btn-import" class="btn btn-ghost" title="Import JSON">↑ Import</button>
-    <button id="btn-export" class="btn btn-ghost" title="Export JSON">↓ Export</button>
-    <button id="btn-reset" class="btn btn-danger-ghost" title="Reset all data">✕ Reset</button>
+  <div style="display: flex; flex-direction: column; align-items: flex-end;">
+    <div class="header-actions">
+      <button id="btn-import" class="btn btn-ghost" title="Import JSON">↑ Import</button>
+      <button id="btn-export" class="btn btn-ghost" title="Export JSON">↓ Export</button>
+      <button id="btn-reset" class="btn btn-danger-ghost" title="Reset all data">✕ Reset</button>
+    </div>
+    <span class="brand-sub" style="font-size: 11px; margin-top: 4px; opacity: 0.8;">Utilize Import/Export to preserve data</span>
   </div>
 </header>
 
@@ -158,16 +160,16 @@
       <span class="empty-icon">💵</span>
       <p>No income sources yet. Add your first one below.</p>
     </div>
-    <div class="add-row-form" id="income-form">
-      <input type="text" id="income-name" placeholder="e.g. Main Job" class="input" />
-      <input type="number" id="income-amount" placeholder="Amount" class="input" min="0" step="0.01" />
-      <select id="income-freq" class="input">
+    <form class="add-row-form" id="income-form">
+      <input type="text" id="income-name" placeholder="e.g. Main Job" class="input" required aria-label="Income Source Name" />
+      <input type="number" id="income-amount" placeholder="Amount" class="input" min="0.01" step="0.01" required aria-label="Income Amount" />
+      <select id="income-freq" class="input" aria-label="Income Frequency">
         <option value="weekly">Weekly</option>
         <option value="biweekly" selected>Biweekly</option>
         <option value="monthly">Monthly</option>
       </select>
-      <button class="btn btn-primary" id="btn-add-income">+ Add</button>
-    </div>
+      <button type="submit" class="btn btn-primary" id="btn-add-income">+ Add</button>
+    </form>
   </div>
 </section>
 
@@ -209,11 +211,11 @@
       <span class="empty-icon">📄</span>
       <p>No bills yet. Add your recurring expenses below.</p>
     </div>
-    <div class="add-row-form bills-form-grid" id="bills-form">
-      <input type="text" id="bill-name" placeholder="e.g. Electric Bill" class="input" />
-      <input type="number" id="bill-amount" placeholder="Amount" class="input" min="0" step="0.01" />
-      <input type="number" id="bill-due" placeholder="Day (1–31)" class="input" min="1" max="31" />
-      <select id="bill-category" class="input">
+    <form class="add-row-form bills-form-grid" id="bills-form">
+      <input type="text" id="bill-name" placeholder="e.g. Electric Bill" class="input" required aria-label="Bill Name" />
+      <input type="number" id="bill-amount" placeholder="Amount" class="input" min="0.01" step="0.01" required aria-label="Bill Amount" />
+      <input type="number" id="bill-due" placeholder="Day (1–31)" class="input" min="1" max="31" required aria-label="Due Day" />
+      <select id="bill-category" class="input" aria-label="Bill Category">
         <option value="Housing">Housing</option>
         <option value="Utilities">Utilities</option>
         <option value="Transportation">Transportation</option>
@@ -224,8 +226,8 @@
         <option value="Other">Other</option>
       </select>
       <label class="toggle-label"><input type="checkbox" id="bill-autopay" /> Auto-Pay</label>
-      <button class="btn btn-primary" id="btn-add-bill">+ Add</button>
-    </div>
+      <button type="submit" class="btn btn-primary" id="btn-add-bill">+ Add</button>
+    </form>
   </div>
 </section>
 
@@ -256,15 +258,15 @@
       <span class="empty-icon">🎉</span>
       <p>No debts tracked. Lucky you — or add one below to plan payoff.</p>
     </div>
-    <div class="add-row-form debt-form-grid" id="debt-form">
-      <input type="text" id="debt-name" placeholder="e.g. Visa Card" class="input" />
-      <input type="number" id="debt-balance" placeholder="Balance ($)" class="input" min="0" step="0.01" />
-      <input type="number" id="debt-rate" placeholder="APR %" class="input" min="0" step="0.01" />
-      <input type="number" id="debt-minpay" placeholder="Min Payment" class="input" min="0" step="0.01" />
-      <input type="number" id="debt-due" placeholder="Due Day" class="input" min="1" max="31" />
-      <input type="text" id="debt-promo" placeholder="Promo End (MM/YYYY)" class="input" />
-      <button class="btn btn-primary" id="btn-add-debt">+ Add</button>
-    </div>
+    <form class="add-row-form debt-form-grid" id="debt-form">
+      <input type="text" id="debt-name" placeholder="e.g. Visa Card" class="input" required aria-label="Debt Name" />
+      <input type="number" id="debt-balance" placeholder="Balance ($)" class="input" min="0" step="0.01" required aria-label="Debt Balance" />
+      <input type="number" id="debt-rate" placeholder="APR %" class="input" min="0" step="0.01" required aria-label="Debt APR" />
+      <input type="number" id="debt-minpay" placeholder="Min Payment" class="input" min="0" step="0.01" required aria-label="Minimum Payment" />
+      <input type="number" id="debt-due" placeholder="Due Day" class="input" min="1" max="31" required aria-label="Due Day" />
+      <input type="text" id="debt-promo" placeholder="Promo End (MM/YYYY)" class="input" aria-label="Promo End Date" pattern="(0[1-9]|1[0-2])\/\d{2,4}" title="Format: MM/YYYY" />
+      <button type="submit" class="btn btn-primary" id="btn-add-debt">+ Add</button>
+    </form>
   </div>
 </section>
 
@@ -329,15 +331,17 @@
       <span class="empty-icon">🎯</span>
       <p>No savings goals yet. Set one below!</p>
     </div>
-    <div class="add-row-form goals-form-grid" id="goals-form">
-      <input type="text" id="goal-name" placeholder="e.g. Emergency Fund" class="input" />
-      <input type="number" id="goal-target" placeholder="Target ($)" class="input" min="0" step="1" />
-      <input type="number" id="goal-saved" placeholder="Already Saved ($)" class="input" min="0" step="0.01" />
-      <input type="number" id="goal-monthly" placeholder="Monthly Contribution" class="input" min="0" step="0.01" />
-      <button class="btn btn-primary" id="btn-add-goal">+ Add Goal</button>
-    </div>
+    <form class="add-row-form goals-form-grid" id="goals-form">
+      <input type="text" id="goal-name" placeholder="e.g. Emergency Fund" class="input" required aria-label="Goal Name" />
+      <input type="number" id="goal-target" placeholder="Target ($)" class="input" min="1" step="1" required aria-label="Target Amount" />
+      <input type="number" id="goal-saved" placeholder="Already Saved ($)" class="input" min="0" step="0.01" aria-label="Already Saved" />
+      <input type="number" id="goal-monthly" placeholder="Monthly Contribution" class="input" min="0" step="0.01" aria-label="Monthly Contribution" />
+      <button type="submit" class="btn btn-primary" id="btn-add-goal">+ Add Goal</button>
+    </form>
   </div>
 </section>
+
+<nav id="side-nav" class="side-nav" aria-label="Quick Navigation"></nav>
 
 <!-- Hidden import file input -->
 <input type="file" id="import-file" accept=".json" style="display:none" />
@@ -355,7 +359,7 @@
 </div>
 
 <footer class="app-footer">
-  <span>© BudgetingReady 2026 — All data saved locally on your device. Nothing is sent anywhere. Visit: <a href="https://budgetingready.com" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:none">Budgetingready.com</a></span>
+  <span>© BudgetingReady 2026 — All data saved locally on your device. Nothing is sent anywhere. Proudly made by <a href="https://ztostart.com" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:none">ZtoStart.com</a></span>
 </footer>
 
 <script src="app.js"></script>

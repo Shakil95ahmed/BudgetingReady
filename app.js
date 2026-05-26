@@ -5,6 +5,11 @@
 
 'use strict';
 
+(function() {
+
+// ── CONSTANTS ────────────────────────────────────
+const BILL_CATEGORIES = ['Housing','Utilities','Transportation','Insurance','Subscriptions','Food','Healthcare','Other'];
+
 // ── SAMPLE STARTER DATA ──────────────────────────
 const SAMPLE_DATA = {
   income: [
@@ -81,32 +86,33 @@ function payoffMonths(balance, rate, payment) {
 // Calculate suggested extra payment for each debt
 function calculateSuggestedPayments() {
   const remaining = calcRemaining();
+  
   if (remaining <= 0 || state.debts.length === 0) {
-    return state.debts.map(d => ({ id: d.id, suggested: 0, reason: 'No extra cash available' }));
+    return state.debts.map(d => ({ 
+      id: d.id, 
+      suggested: d.minpay, 
+      reason: 'No extra cash available. Minimum payment only.',
+      priority: 0 
+    }));
   }
 
-  const suggestions = [];
-  let availableExtra = remaining * 0.8; // Use 80% of remaining for debt, keep 20% buffer
+  let availableExtra = remaining * 0.8; // Use 80% of remaining, keep 20% buffer
 
-  // Clone debts for manipulation
+  // 1. Identify minimum payments and calculate target extra for promos
   const debtsWithSuggestions = state.debts.map(d => {
-    const now = new Date();
-    let suggestedPayment = d.minpay;
-    let reason = 'Minimum payment only';
     let promoMonthsLeft = null;
-
-    // Check for promo APR
+    let targetExtra = 0;
+    
     if (d.promo) {
-      const [m, y] = d.promo.split('/').map(Number);
+      let [m, y] = d.promo.split('/').map(Number);
       if (m && y) {
-        promoMonthsLeft = (y - now.getFullYear()) * 12 + (m - 1 - now.getMonth());
+        if (y < 100) y += 2000;
+        promoMonthsLeft = (y - new Date().getFullYear()) * 12 + (m - 1 - new Date().getMonth());
         
         if (promoMonthsLeft > 0 && promoMonthsLeft <= 12) {
-          // Urgently pay off before promo ends
           const promoPayment = Math.ceil(d.balance / promoMonthsLeft);
           if (promoPayment > d.minpay) {
-            suggestedPayment = promoPayment;
-            reason = `Pay off before promo ends (${promoMonthsLeft} mo left)`;
+            targetExtra = promoPayment - d.minpay;
           }
         }
       }
@@ -114,37 +120,42 @@ function calculateSuggestedPayments() {
 
     return { 
       ...d, 
-      suggestedPayment, 
-      reason, 
+      suggestedPayment: d.minpay, 
+      reason: 'Minimum payment only', 
       promoMonthsLeft,
-      priority: 0 
+      targetExtra,
+      priority: 0
     };
   });
 
-  // If no promo urgency, use avalanche method (highest APR first)
-  const sorted = [...debtsWithSuggestions].sort((a, b) => b.rate - a.rate);
-  
-  // Allocate extra payment to highest priority debt
-  if (availableExtra > 0 && sorted.length > 0) {
-    const topDebt = sorted[0];
-    
-    // Find if there's a promo debt that needs urgent payment
-    const urgentPromo = debtsWithSuggestions.find(d => 
-      d.promoMonthsLeft !== null && d.promoMonthsLeft > 0 && d.promoMonthsLeft <= 6
-    );
+  const getPriorityScore = (d) => {
+    if (d.promoMonthsLeft > 0 && d.promoMonthsLeft <= 6) return 1000 + (100 - d.promoMonthsLeft);
+    if (d.promoMonthsLeft > 6 && d.promoMonthsLeft <= 12) return 500 + (100 - d.promoMonthsLeft);
+    return d.rate;
+  };
 
-    if (urgentPromo) {
-      // Prioritize promo debt
-      const needed = urgentPromo.suggestedPayment - urgentPromo.minpay;
-      const allocated = Math.min(availableExtra, needed);
-      urgentPromo.suggestedPayment = urgentPromo.minpay + allocated;
-      urgentPromo.priority = 1;
-    } else {
-      // Use avalanche method - add extra to highest APR
-      topDebt.suggestedPayment = topDebt.minpay + Math.min(availableExtra, topDebt.balance - topDebt.minpay);
-      topDebt.reason = `Highest APR (${topDebt.rate}%) - avalanche method`;
-      topDebt.priority = 1;
+  const sortedDebts = [...debtsWithSuggestions].sort((a, b) => getPriorityScore(b) - getPriorityScore(a));
+
+  for (let debt of sortedDebts) {
+    if (availableExtra <= 0) break;
+
+    let allocate = 0;
+    
+    if (debt.targetExtra > 0) {
+      allocate = Math.min(availableExtra, debt.targetExtra);
+      debt.reason = `Pay off before promo ends (${debt.promoMonthsLeft} mo left)`;
+      debt.priority = 1;
+    } else if (debt.rate > 0) {
+      const remainingBalance = Math.max(0, debt.balance - debt.minpay);
+      allocate = Math.min(availableExtra, remainingBalance);
+      if (allocate > 0) {
+        debt.reason = `Highest APR (${debt.rate}%) - Avalanche method`;
+        debt.priority = 1;
+      }
     }
+
+    debt.suggestedPayment += allocate;
+    availableExtra -= allocate;
   }
 
   return debtsWithSuggestions.map(d => ({
@@ -551,19 +562,20 @@ function renderIncomeRows() {
   tbody.innerHTML = sorted.map(src => {
     const monthly = toMonthly(src.amount, src.freq);
     const freqLabel = { weekly: 'Weekly', biweekly: 'Biweekly', monthly: 'Monthly' }[src.freq];
-    return `<tr data-id="${escHtml(src.id)}" onclick="openEditModal('income','${escHtml(src.id)}',event)" title="Click to edit">
+    return `<tr data-id="${escHtml(src.id)}" class="editable-row" data-section="income" title="Click to edit">
       <td><span class="mono">${escHtml(src.name)}</span></td>
       <td><span class="mono">${fmt(src.amount)}</span></td>
       <td class="col-hide-sm">${escHtml(freqLabel)}</td>
       <td><span class="mono" style="color:var(--green)">${fmt(monthly)}</span></td>
       <td style="text-align:right">
-        <button class="btn-icon" onclick="deleteItem('income','${escHtml(src.id)}');event.stopPropagation()" title="Delete">&#x2715;</button>
+        <button type="button" class="btn-icon delete-btn" data-section="income" data-id="${escHtml(src.id)}" title="Delete" aria-label="Delete">&#x2715;</button>
       </td>
     </tr>`;
   }).join('');
 }
 
-document.getElementById('btn-add-income').addEventListener('click', () => {
+document.getElementById('income-form').addEventListener('submit', (e) => {
+  e.preventDefault();
   const name   = document.getElementById('income-name').value.trim();
   const amount = parseFloat(document.getElementById('income-amount').value);
   const freq   = document.getElementById('income-freq').value;
@@ -616,7 +628,7 @@ function renderBillRows() {
       soon:    '<span class="badge badge-yellow">Due Soon</span>',
       ok:      '<span class="badge badge-green">OK</span>'
     }[status];
-    return `<tr data-id="${escHtml(bill.id)}" onclick="openEditModal('bills','${escHtml(bill.id)}',event)" title="Click to edit">
+    return `<tr data-id="${escHtml(bill.id)}" class="editable-row" data-section="bills" title="Click to edit">
       <td><span class="mono">${escHtml(bill.name)}</span></td>
       <td><span class="mono">${fmt(bill.amount)}</span></td>
       <td class="col-hide-sm">Day ${bill.due}</td>
@@ -624,13 +636,14 @@ function renderBillRows() {
       <td class="col-hide-sm">${bill.autopay ? '<span class="badge badge-green">&#x2713; Auto</span>' : '<span style="color:var(--text3);font-size:12px">Manual</span>'}</td>
       <td>${statusBadge}</td>
       <td style="text-align:right">
-        <button class="btn-icon" onclick="deleteItem('bills','${escHtml(bill.id)}');event.stopPropagation()" title="Delete">&#x2715;</button>
+        <button type="button" class="btn-icon delete-btn" data-section="bills" data-id="${escHtml(bill.id)}" title="Delete" aria-label="Delete">&#x2715;</button>
       </td>
     </tr>`;
   }).join('');
 }
 
-document.getElementById('btn-add-bill').addEventListener('click', () => {
+document.getElementById('bills-form').addEventListener('submit', (e) => {
+  e.preventDefault();
   const name     = document.getElementById('bill-name').value.trim();
   const amount   = parseFloat(document.getElementById('bill-amount').value);
   const due      = parseInt(document.getElementById('bill-due').value);
@@ -720,8 +733,6 @@ function renderDebtCards() {
       ? `~${suggestedMonths} months at suggested payment`
       : null;
 
-    const utilPct = Math.min(100, Math.round((debt.balance / (debt.balance + 500)) * 100));
-    const barClass = debt.rate > 20 ? 'danger' : debt.rate > 12 ? 'warning' : '';
     const isHighApr = debt.rate > 20;
     const hasPromo  = !!debt.promo;
     const isPriority = suggestion.priority === 1;
@@ -771,13 +782,13 @@ function renderDebtCards() {
       `;
     }
 
-    return `<div class="debt-card ${isHighApr ? 'high-apr' : ''} ${hasPromo ? 'promo' : ''} ${isPriority ? 'priority-debt' : ''}" data-id="${escHtml(debt.id)}" onclick="openEditModal('debts','${escHtml(debt.id)}',event)" title="Click to edit">
+    return `<div class="debt-card editable-row ${isHighApr ? 'high-apr' : ''} ${hasPromo ? 'promo' : ''} ${isPriority ? 'priority-debt' : ''}" data-id="${escHtml(debt.id)}" data-section="debts" title="Click to edit">
       <div class="debt-card-header">
         <div class="debt-card-name">${escHtml(debt.name)}</div>
         <div style="display:flex;gap:6px;align-items:center">
           ${isHighApr ? '<span class="badge badge-red">High APR</span>' : ''}
           ${isPriority ? '<span class="badge badge-green">Priority</span>' : ''}
-          <button class="btn-icon" onclick="deleteItem('debts','${escHtml(debt.id)}');event.stopPropagation()" title="Delete">&#x2715;</button>
+          <button type="button" class="btn-icon delete-btn" data-section="debts" data-id="${escHtml(debt.id)}" title="Delete" aria-label="Delete">&#x2715;</button>
         </div>
       </div>
       <div class="debt-card-meta">
@@ -798,13 +809,6 @@ function renderDebtCards() {
           <span class="debt-meta-value">Day ${debt.due}</span>
         </div>
       </div>
-      <div class="debt-progress-label">
-        <span>Debt Load</span>
-        <span>${utilPct}%</span>
-      </div>
-      <div class="progress-track">
-        <div class="progress-bar ${barClass}" style="width:${utilPct}%"></div>
-      </div>
       <div class="debt-payoff-note">Payoff at min: ${payoffStr}</div>
       ${promoNote}
       ${suggestionSection}
@@ -816,7 +820,8 @@ function renderDebtCards() {
   wrap.appendChild(grid);
 }
 
-document.getElementById('btn-add-debt').addEventListener('click', () => {
+document.getElementById('debt-form').addEventListener('submit', (e) => {
+  e.preventDefault();
   const name    = document.getElementById('debt-name').value.trim();
   const balance = parseFloat(document.getElementById('debt-balance').value);
   const rate    = parseFloat(document.getElementById('debt-rate').value);
@@ -869,10 +874,10 @@ function renderGoals() {
 
     const barClass = pct >= 80 ? '' : pct >= 40 ? 'warning' : 'danger';
 
-    return `<div class="goal-card" data-id="${escHtml(goal.id)}" onclick="openEditModal('goals','${escHtml(goal.id)}',event)" title="Click to edit">
+    return `<div class="goal-card editable-row" data-id="${escHtml(goal.id)}" data-section="goals" title="Click to edit">
       <div class="goal-header">
         <div class="goal-name">${escHtml(goal.name)}</div>
-        <button class="btn-icon" onclick="deleteItem('goals','${escHtml(goal.id)}');event.stopPropagation()" title="Delete">&#x2715;</button>
+        <button type="button" class="btn-icon delete-btn" data-section="goals" data-id="${escHtml(goal.id)}" title="Delete" aria-label="Delete">&#x2715;</button>
       </div>
       <div class="goal-amounts">
         <span>Saved: <strong>${fmt(goal.saved)}</strong></span>
@@ -892,7 +897,8 @@ function renderGoals() {
   }).join('');
 }
 
-document.getElementById('btn-add-goal').addEventListener('click', () => {
+document.getElementById('goals-form').addEventListener('submit', (e) => {
+  e.preventDefault();
   const name    = document.getElementById('goal-name').value.trim();
   const target  = parseFloat(document.getElementById('goal-target').value);
   const saved   = parseFloat(document.getElementById('goal-saved').value) || 0;
@@ -927,8 +933,7 @@ const EDIT_FIELDS = {
     { key: 'amount',   label: 'Amount ($)',      type: 'number', min: 0, step: 0.01 },
     { key: 'due',      label: 'Due Day (1–31)', type: 'number', min: 1, max: 31 },
     { key: 'category', label: 'Category',        type: 'select',
-      options: ['Housing','Utilities','Transportation','Insurance','Subscriptions','Food','Healthcare','Other']
-        .map(c => ({ value: c, label: c })) },
+      options: BILL_CATEGORIES.map(c => ({ value: c, label: c })) },
     { key: 'autopay',  label: 'Auto-Pay',        type: 'checkbox' },
     { key: 'comment',  label: 'Comment (optional)', type: 'textarea' }
   ],
@@ -1053,12 +1058,32 @@ document.getElementById('edit-modal-overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('edit-modal-overlay')) closeEditModal();
 });
 
-// Close on Escape key
+// Close on Escape key and trap Focus
 document.addEventListener('keydown', e => {
+  const modal = document.getElementById('edit-modal-overlay');
+  if (modal.classList.contains('hidden')) return;
+
   if (e.key === 'Escape') closeEditModal();
-  if (e.key === 'Enter' && !document.getElementById('edit-modal-overlay').classList.contains('hidden')) {
-    // Allow Enter inside textarea but save on Enter in inputs
-    if (document.activeElement.tagName !== 'TEXTAREA') saveEditModal();
+  if (e.key === 'Enter' && document.activeElement.tagName !== 'TEXTAREA') saveEditModal();
+
+  if (e.key === 'Tab') {
+    const focusableElements = modal.querySelectorAll('input, select, textarea, button');
+    if (focusableElements.length === 0) return;
+    
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+
+    if (e.shiftKey) {
+      if (document.activeElement === firstElement) {
+        e.preventDefault();
+        lastElement.focus();
+      }
+    } else {
+      if (document.activeElement === lastElement) {
+        e.preventDefault();
+        firstElement.focus();
+      }
+    }
   }
 });
 
@@ -1127,6 +1152,21 @@ document.getElementById('btn-reset').addEventListener('click', () => {
   showToast('All data reset.', 'warning');
 });
 
+// ── EVENT DELEGATION ──────────────────────────────
+document.addEventListener('click', e => {
+  const deleteBtn = e.target.closest('.delete-btn');
+  if (deleteBtn) {
+    e.stopPropagation();
+    deleteItem(deleteBtn.dataset.section, deleteBtn.dataset.id);
+    return;
+  }
+  
+  const editableRow = e.target.closest('.editable-row');
+  if (editableRow) {
+    openEditModal(editableRow.dataset.section, editableRow.dataset.id, e);
+  }
+});
+
 // ── RENDER ALL ────────────────────────────────────
 function renderAll() {
   renderIncomeRows();
@@ -1168,6 +1208,54 @@ document.addEventListener('input', e => {
   // If user edits inline table cells in the future, save here
 });
 
+// ── SIDE NAVIGATION ───────────────────────────────
+function initSideNavigation() {
+  const nav = document.getElementById('side-nav');
+  if (!nav) return;
+  
+  const sections = document.querySelectorAll('section.section');
+  if (sections.length === 0) return;
+
+  const navHTML = Array.from(sections).map(sec => {
+    const titleEl = sec.querySelector('.section-title');
+    const iconEl = sec.querySelector('.section-icon');
+    const title = titleEl ? titleEl.textContent : 'Top';
+    const icon = iconEl ? iconEl.textContent : '⌂';
+    
+    return `<div class="side-nav-link" data-target="${sec.id}">
+      <span class="side-nav-label">${title}</span>
+      <a href="#${sec.id}" class="side-nav-icon" style="color: inherit; text-decoration: none;">${icon}</a>
+    </div>`;
+  }).join('');
+  
+  nav.innerHTML = navHTML;
+
+  // Scroll spy and disappearing labels
+  const navLinks = nav.querySelectorAll('.side-nav-link');
+  let scrollTimeout;
+
+  window.addEventListener('scroll', () => {
+    nav.classList.add('show-labels');
+    clearTimeout(scrollTimeout);
+    scrollTimeout = setTimeout(() => nav.classList.remove('show-labels'), 1000);
+
+    let current = '';
+    sections.forEach(sec => {
+      const sectionTop = sec.offsetTop;
+      if (scrollY >= sectionTop - 150) {
+        current = sec.id;
+      }
+    });
+
+    navLinks.forEach(link => {
+      link.classList.remove('active');
+      if (link.dataset.target === current) {
+        link.classList.add('active');
+      }
+    });
+  });
+}
+
 // ── INIT ──────────────────────────────────────────
 (async function init() {
   // Initialize IndexedDB first
@@ -1175,10 +1263,13 @@ document.addEventListener('input', e => {
   
   const loaded = await loadState();
   renderAll();
+  initSideNavigation();
   checkOnboarding();
 
   if (loaded && (state.income.length || state.bills.length || state.debts.length)) {
     // Silently note data was restored
     setTimeout(() => showToast('Your data was restored from last session.', 'success', 3000), 600);
   }
+})();
+
 })();
