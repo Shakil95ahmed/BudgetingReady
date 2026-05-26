@@ -61,7 +61,7 @@ A modern, privacy-focused single-page budgeting web application built with vanil
 3. That's it! No installation, no npm, no build step.
 
 ### Option 2: Try the Demo
-Visit the [live demo]([https://ztostart.com/budgetingready](https://shakil95ahmed.github.io/br-online/)) (if hosted)
+Visit the [live demo](https://[ztostart.com](https://shakil95ahmed.github.io/br-online/))
 
 ---
 
